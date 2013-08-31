@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# stdin should always be small, so reading it all into memory isn't an issue
+if read line; then
+    STDIN="$line"
+fi
+
+while read line; do
+    STDIN="$STDIN\n$line"
+done
+
+for hook in ./hooks/post-receive.d/*; do
+    if [ -x $hook ]; then
+        echo -e "$STDIN" | $hook || exit $?
+    fi
+done

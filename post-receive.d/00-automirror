@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+BRANCHES="release beta master"
+MIRRORS="github"
+
+declare -A bmap
+for branch in "$BRANCHES"; do
+    bmap["$branch"]=1
+done
+
+while read oldrev newrev refname; do
+    newtomirror=
+    case $refname in
+        refs/heads/*)
+            branch="${refname#refs/heads/}"
+            if [ -n "${bmap[$branch]}" ]; then
+                newtomirror="$branch"
+            fi
+            ;;
+        refs/tags/*) newtomirror="${refname#refs/tags/}" ;;
+    esac
+    if [ -z "$newtomirror" ]; then
+        continue
+    fi
+    if [ "$newrev" == "0000000000000000000000000000000000000000" ]; then
+        tomirror="$tomirror :$newtomirror"
+    else
+        tomirror="$tomirror $newrev:$newtomirror"
+    fi
+done
+
+if [ -n "$tomirror" ]; then
+    for mirror in "$MIRRORS"; do
+        git push --force $mirror $tomirror
+    done
+fi
