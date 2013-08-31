@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+for hook in ./hooks/update.d/*; do
+    if [ -x "$hook" ]; then
+        $hook "$@" || exit $?
+    fi
+done

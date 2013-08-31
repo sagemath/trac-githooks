@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# the mecurial tree still has commits with trailing empty newlines being merged
+# so disable for now
+exit
+
+refname=$1
+oldrev=$2
+newrev=$3
+
+if [ "$newrev" == "0000000000000000000000000000000000000000" ]; then
+    exit
+fi
+
+if [ "$oldrev" == "0000000000000000000000000000000000000000" ]; then
+    oldrev=$(git merge-base $newrev master)
+fi
+
+if ! git diff-tree -r --name-only $oldrev..$newrev | sed -e '/\.patch$/d' -e '/\.diff$/d' | xargs git diff --check $oldrev..$newrev --; then
+    echo >&2 "*** Trailing whitespace in branch ${refname#refs/heads/} is not allowed, please fix and re-upload ***"
+    exit 1
+fi
