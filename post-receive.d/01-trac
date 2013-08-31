@@ -7,7 +7,7 @@ from trac_password import TRAC_PASSWORD
 
 # The Trac XMLRPC interface
 TRAC_URL = 'http://trac.sagemath.org/xmlrpc'
-TRAC_URL_LOGIN = 'http://git:%s@trac.sagemath.org/login/xmlrpc'
+TRAC_URL_LOGIN = 'http://git:%s@trac.sagemath.org/login/xmlrpc'%TRAC_PASSWORD
 
 
 #### this script assumes that you have the following in your trac.ini
