@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 # putting the trac password in another file so that this file can be share publicly
 from trac_password import TRAC_PASSWORD
 
@@ -17,8 +19,6 @@ TRAC_URL_LOGIN = 'http://git:%s@trac.sagemath.org/login/xmlrpc'
 # commit.label = Commit
 #
 # [ticket-workflow]
-# leave = * -> *
-# leave.operations = leave_status
 # back_to_review = positive_review -> needs_review
 # back_to_review.name = resubmit to review
 # back_to_review.permissions = TICKET_MODIFY
@@ -89,20 +89,17 @@ class Trac(object):
         # future then the server will reply with "Sorry, can not save
         # your changes. This ticket has been modified by someone else
         # since you started'"
-        ts = ticket['_ts']
+        attributes = {'_ts': ticket['_ts'], 'commit':new_commit_sha1}
         comment = 'Branch pushed to git repo; I updated commit sha1'
         if ticket['status'] == 'positive_review':
-            action = 'back_to_review'
+            attributes['action'] = 'back_to_review'
             comment += ' and set ticket back to needs_review'
             print('Trac #{0}: Commit changed to {1}, setting ticket back to needs_review.'.format(
                 number, new_commit_sha1[:6]))
         else:
-            action = 'leave'
             print('Trac #{0}: Commit changed to {1}.'.format(number, new_commit_sha1[:6]))
         comment += '. Recent commits:\n' + self.log_table(new_commit_sha1)
-        self.login.ticket.update(number, comment, 
-                                 {'_ts':ts, 'action':action, 'commit':new_commit_sha1},
-                                 False)
+        self.login.ticket.update(number, comment, attributes, False)
 
 
 if __name__ == '__main__':

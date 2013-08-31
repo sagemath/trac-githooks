@@ -1,2 +1,3 @@
 *.sample
+*.pyc
 post-receive.d/trac_password.py
