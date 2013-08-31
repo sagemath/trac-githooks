@@ -42,10 +42,6 @@ class Trac(object):
         self._cache = dict()
         self.url = kwds.get('url', TRAC_URL)
 
-
-    def rpc_url(self):
-        return
-
     @property
     def rpc(self):
         if self._rpc is None:
