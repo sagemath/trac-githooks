@@ -11,6 +11,6 @@ done
 
 for hook in ./hooks/post-receive.d/*; do
     if [ -x $hook ]; then
-        echo -e "$STDIN" | $hook || exit $?
+        echo -e "$STDIN" | $hook
     fi
 done
