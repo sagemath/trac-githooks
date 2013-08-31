@@ -4,10 +4,10 @@ from __future__ import print_function
 
 # putting the trac password in another file so that this file can be share publicly
 from trac_password import TRAC_PASSWORD
+TRAC_USER = 'git'
 
-# The Trac XMLRPC interface
-TRAC_URL = 'http://trac.sagemath.org/xmlrpc'
-TRAC_URL_LOGIN = 'http://git:%s@trac.sagemath.org/login/xmlrpc'%TRAC_PASSWORD
+TRAC_URL = 'http://trac.sagemath.org'
+REALM = 'sage.math.washington.edu'
 
 
 #### this script assumes that you have the following in your trac.ini
@@ -36,23 +36,34 @@ except ImportError:  # python 2.x
 
 class Trac(object):
     
-    def __init__(self, trac_url, trac_url_login):
+    def __init__(self, username, password, **kwds):
         self._rpc = None
-        self._login = None
+        self._login = (username, password, kwds.get('realm', REALM))
         self._cache = dict()
-        self.url = trac_url
-        self.url_login = trac_url_login
+        self.url = kwds.get('url', TRAC_URL)
+
+
+    def rpc_url(self):
+        return
 
     @property
     def rpc(self):
         if self._rpc is None:
-            self._rpc = ServerProxy(self.url)
+            import digest_transport, urlparse
+            self._rpc = ServerProxy(urlparse.urljoin(self.url, 'xmlrpc'),
+                    transport=digest_transport.DigestTransport())
         return self._rpc
 
     @property
     def login(self):
-        if self._login is None:
-            self._login = ServerProxy(self.url_login)
+        if isinstance(self._login, tuple):
+            import digest_transport, os, urllib, urlparse
+            transport = digest_transport.DigestTransport()
+            username, password, realm = self._login
+            transport.add_authentication(realm=realm, url=self.url, username=username, password=password)
+            url = urlparse.urljoin(self.url,
+                    urllib.pathname2url(os.path.join('login', 'xmlrpc')))
+            self._login = ServerProxy(url, transport=transport)
         return self._login
             
 
@@ -103,7 +114,7 @@ class Trac(object):
 
 
 if __name__ == '__main__':
-    trac = Trac(TRAC_URL, TRAC_URL_LOGIN)
+    trac = Trac(TRAC_USER, TRAC_PASSWORD)
     for line in sys.stdin.readlines():
         oldref, newref, refname = line.split()
         if not refname.startswith('refs/heads/'):
