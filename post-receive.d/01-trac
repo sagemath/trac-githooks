@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+
+# putting the trac password in another file so that this file can be share publicly
+from trac_password import TRAC_PASSWORD
+
+# The Trac XMLRPC interface
+TRAC_URL = 'http://trac.sagemath.org/xmlrpc'
+TRAC_URL_LOGIN = 'http://git:%s@trac.sagemath.org/login/xmlrpc'
+
+
+#### this script assumes that you have the following in your trac.ini
+#
+# [ticket-custom]
+# branch = text
+# branch.label = Branch
+# commit = text
+# commit.label = Commit
+#
+# [ticket-workflow]
+# leave = * -> *
+# leave.operations = leave_status
+# back_to_review = positive_review -> needs_review
+# back_to_review.name = resubmit to review
+# back_to_review.permissions = TICKET_MODIFY
+# ...
+
+import os
+import sys
+import subprocess
+
+try:  # py3
+    from xmlrpc.client import ServerProxy
+except ImportError:  # python 2.x
+    from xmlrpclib import ServerProxy
+
+
+class Trac(object):
+    
+    def __init__(self, trac_url, trac_url_login):
+        self._rpc = None
+        self._login = None
+        self._cache = dict()
+        self.url = trac_url
+        self.url_login = trac_url_login
+
+    @property
+    def rpc(self):
+        if self._rpc is None:
+            self._rpc = ServerProxy(self.url)
+        return self._rpc
+
+    @property
+    def login(self):
+        if self._login is None:
+            self._login = ServerProxy(self.url_login)
+        return self._login
+            
+
+    def ticket_iter(self, branch):
+        for result in self.rpc.search.branch(branch):
+            ticket_number = result[0]
+            yield self.get(ticket_number)
+        
+    def get(self, ticket_number):
+        try:
+            return self._cache[ticket_number]
+        except KeyError:
+            result = self.rpc.ticket.get(ticket_number)
+            assert result[0] == ticket_number
+            output = (ticket_number, result[3])
+            self._cache[ticket_number] = output
+            return output
+    
+    def log_table(self, new_commit, limit=5):
+        log = subprocess.check_output(['git', 'log', '--oneline', '--max-count=5', 
+                                       new_commit, '^master'])
+        table = []
+        for line in log.splitlines():
+            short_sha1 = line[:7]
+            title = line[8:]
+            table.append('||{0}||{1}||'.format(short_sha1, title))
+        return '\n'.join(table)
+
+    def update_commit(self, number, ticket, new_commit_sha1):
+        if ticket['commit'] == new_commit_sha1:
+            print('Commit {0} is already listed on trac ticket, doing nothing.'.format(new_commit_sha1[:6]))
+            return
+        # ts = time stamp. If we send back a timestamp too far in the
+        # future then the server will reply with "Sorry, can not save
+        # your changes. This ticket has been modified by someone else
+        # since you started'"
+        ts = ticket['_ts']
+        comment = 'Branch pushed to git repo; I updated commit sha1'
+        if ticket['status'] == 'positive_review':
+            action = 'back_to_review'
+            comment += ' and set ticket back to needs_review'
+            print('Trac #{0}: Commit changed to {1}, setting ticket back to needs_review.'.format(
+                number, new_commit_sha1[:6]))
+        else:
+            action = 'leave'
+            print('Trac #{0}: Commit changed to {1}.'.format(number, new_commit_sha1[:6]))
+        comment += '. Recent commits:\n' + self.log_table(new_commit_sha1)
+        self.login.ticket.update(number, comment, 
+                                 {'_ts':ts, 'action':action, 'commit':new_commit_sha1},
+                                 False)
+
+
+if __name__ == '__main__':
+    trac = Trac(TRAC_URL, TRAC_URL_LOGIN)
+    for line in sys.stdin.readlines():
+        oldref, newref, refname = line.split()
+        if not refname.startswith('refs/heads/'):
+            continue
+        branch = refname.split('/', 2)[-1]
+        #print('pushing to branch {0}, new head commit is {1}'.format(branch, newref[:6]))
+        for number, ticket in trac.ticket_iter(branch):
+            trac.update_commit(number, ticket, newref)
