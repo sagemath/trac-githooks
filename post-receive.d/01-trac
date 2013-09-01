@@ -96,7 +96,7 @@ class Trac(object):
         return '\n'.join(table)
 
     def is_ancestor_of(self, a, b):
-        return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b])
+        return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b]).strip()
 
     def update_commit(self, number, ticket, oldref, newref):
         if ticket.get('commit') == newref:
