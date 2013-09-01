@@ -4,7 +4,7 @@ BRANCHES="release beta master"
 MIRRORS="github"
 
 declare -A bmap
-for branch in "$BRANCHES"; do
+for branch in $BRANCHES; do
     bmap["$branch"]=1
 done
 
