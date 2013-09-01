@@ -123,7 +123,7 @@ class Trac(object):
             comment += 'New commits:\n' + self.log_table(newref, oldref)
         else:
             comment += 'This was a forced push. Recent commits:\n' + self.log_table(newref, limit=5)
-        self.login.ticket.update(number, comment, attributes, False)
+        self.login.ticket.update(number, comment, attributes, True)
 
 
 if __name__ == '__main__':
