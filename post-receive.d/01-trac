@@ -79,13 +79,13 @@ class Trac(object):
             self._cache[ticket_number] = output
             return output
     
-    def log_table(self, new_commit, old_commit=None, limit=None):
+    def log_table(self, new_commit, old_commit='0'*40, limit=None):
         git_cmd = ['git', 'log', '--oneline']
         if limit is not None:
             git_cmd.append('--max-count={0}'.format(limit))
         git_cmd.append(new_commit)
         git_cmd.append('^{0}'.format(MASTER_BRANCH))
-        if old_commit is not None:
+        if old_commit != '0'*40:
             git_cmd.append('^{0}'.format(old_commit))
         log = subprocess.check_output(git_cmd)
         table = []
