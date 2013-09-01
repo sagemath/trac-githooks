@@ -100,7 +100,10 @@ class Trac(object):
 
     def update_commit(self, number, ticket, oldref, newref):
         if ticket.get('commit') == newref:
-            print('Commit {0} is already listed on trac ticket, doing nothing.'.format(newref[:6]))
+            print('Commit {0} is already listed on trac ticket {1}, doing nothing.'.format(newref[:6], number))
+            return
+        elif newref == '0'*40:
+            print('Warning, deleting branch that is attached to trac ticket {0}'.format(number))
             return
         # ts = time stamp. If we send back a timestamp too far in the
         # future then the server will reply with "Sorry, can not save
