@@ -8,6 +8,7 @@ TRAC_USER = 'git'
 
 TRAC_URL = 'http://trac.sagemath.org'
 REALM = 'sage.math.washington.edu'
+MASTER_BRANCH = 'u/ohanar/build_system'
 
 
 #### this script assumes that you have the following in your trac.ini
@@ -78,9 +79,15 @@ class Trac(object):
             self._cache[ticket_number] = output
             return output
     
-    def log_table(self, new_commit, limit=5):
-        log = subprocess.check_output(['git', 'log', '--oneline', '--max-count=5', 
-                                       new_commit, '^master'])
+    def log_table(self, new_commit, old_commit=None, limit=None):
+        git_cmd = ['git', 'log', '--oneline']
+        if limit is not None:
+            git_cmd.append('--max-count={0}'.format(limit))
+        git_cmd.append(new_commit)
+        git_cmd.append('^{0}'.format(MASTER_BRANCH))
+        if old_commit is not None:
+            git_cmd.append('^{0}'.format(old_commit))
+        log = subprocess.check_output(git_cmd)
         table = []
         for line in log.splitlines():
             short_sha1 = line[:7]
@@ -88,24 +95,31 @@ class Trac(object):
             table.append('||[changeset:{0}]||{1}||'.format(short_sha1, title))
         return '\n'.join(table)
 
-    def update_commit(self, number, ticket, new_commit_sha1):
-        if ticket['commit'] == new_commit_sha1:
-            print('Commit {0} is already listed on trac ticket, doing nothing.'.format(new_commit_sha1[:6]))
+    def is_ancestor_of(self, a, b):
+        return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b])
+
+    def update_commit(self, number, ticket, oldref, newref):
+        if ticket['commit'] == newref:
+            print('Commit {0} is already listed on trac ticket, doing nothing.'.format(newref[:6]))
             return
         # ts = time stamp. If we send back a timestamp too far in the
         # future then the server will reply with "Sorry, can not save
         # your changes. This ticket has been modified by someone else
         # since you started'"
-        attributes = {'_ts': ticket['_ts'], 'commit':new_commit_sha1}
+        attributes = {'_ts': ticket['_ts'], 'commit':newref}
         comment = 'Branch pushed to git repo; I updated commit sha1'
         if ticket['status'] == 'positive_review':
             attributes['action'] = 'back_to_review'
             comment += ' and set ticket back to needs_review'
             print('Trac #{0}: Commit changed to {1}, setting ticket back to needs_review.'.format(
-                number, new_commit_sha1[:6]))
+                number, newref[:6]))
         else:
-            print('Trac #{0}: Commit changed to {1}.'.format(number, new_commit_sha1[:6]))
-        comment += '. Recent commits:\n' + self.log_table(new_commit_sha1)
+            print('Trac #{0}: Commit changed to {1}.'.format(number, newref[:6]))
+        comment += '. '
+        if self.is_ancestor_of(oldref, newref):
+            comment += 'New commits:\n' + self.log_table(newref, oldref)
+        else:
+            comment += 'This was a forced push. Recent commits:\n' + self.log_table(newref, limit=5)
         self.login.ticket.update(number, comment, attributes, False)
 
 
@@ -118,4 +132,4 @@ if __name__ == '__main__':
         branch = refname.split('/', 2)[-1]
         #print('pushing to branch {0}, new head commit is {1}'.format(branch, newref[:6]))
         for number, ticket in trac.ticket_iter(branch):
-            trac.update_commit(number, ticket, newref)
+            trac.update_commit(number, ticket, oldref, newref)
