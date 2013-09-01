@@ -85,7 +85,7 @@ class Trac(object):
         for line in log.splitlines():
             short_sha1 = line[:7]
             title = line[8:]
-            table.append('||{0}||{1}||'.format(short_sha1, title))
+            table.append('||[changeset:{0}]||{1}||'.format(short_sha1, title))
         return '\n'.join(table)
 
     def update_commit(self, number, ticket, new_commit_sha1):
