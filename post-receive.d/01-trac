@@ -99,7 +99,7 @@ class Trac(object):
         return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b])
 
     def update_commit(self, number, ticket, oldref, newref):
-        if ticket['commit'] == newref:
+        if ticket.get('commit') == newref:
             print('Commit {0} is already listed on trac ticket, doing nothing.'.format(newref[:6]))
             return
         # ts = time stamp. If we send back a timestamp too far in the
