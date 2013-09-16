@@ -25,7 +25,7 @@ while read oldrev newrev refname; do
     if [ "$newrev" == "0000000000000000000000000000000000000000" ]; then
         tomirror="$tomirror :$newtomirror"
     else
-        tomirror="$tomirror $newrev:$newtomirror"
+        tomirror="$tomirror $newtomirror"
     fi
 done
 
