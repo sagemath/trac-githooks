@@ -8,7 +8,7 @@ TRAC_USER = 'git'
 
 TRAC_URL = 'http://trac.sagemath.org'
 REALM = 'sage.math.washington.edu'
-MASTER_BRANCH = 'u/ohanar/build_system'
+MASTER_BRANCHES = {'u/ohanar/build_system', 'u/saraedum/ticket/14482'}
 
 
 #### this script assumes that you have the following in your trac.ini
@@ -28,6 +28,7 @@ MASTER_BRANCH = 'u/ohanar/build_system'
 import os
 import sys
 import subprocess
+import copy
 
 try:  # py3
     from xmlrpc.client import ServerProxy
@@ -79,14 +80,13 @@ class Trac(object):
             self._cache[ticket_number] = output
             return output
     
-    def log_table(self, new_commit, old_commit='0'*40, limit=None):
+    def log_table(self, new_commit, limit=None, ignore=MASTER_BRANCHES):
         git_cmd = ['git', 'log', '--oneline']
         if limit is not None:
             git_cmd.append('--max-count={0}'.format(limit))
         git_cmd.append(new_commit)
-        git_cmd.append('^{0}'.format(MASTER_BRANCH))
-        if old_commit != '0'*40:
-            git_cmd.append('^{0}'.format(old_commit))
+        for branch in ignore:
+            git_cmd.append('^{0}'.format(branch))
         log = subprocess.check_output(git_cmd)
         table = []
         for line in log.splitlines():
@@ -98,7 +98,7 @@ class Trac(object):
     def is_ancestor_of(self, a, b):
         return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b]).strip()
 
-    def update_commit(self, number, ticket, oldref, newref):
+    def update_commit(self, number, ticket, branch, oldref, newref):
         if ticket.get('commit') == newref:
             print('Commit {0} is already listed on trac ticket {1}, doing nothing.'.format(newref[:6], number))
             return
@@ -120,7 +120,11 @@ class Trac(object):
             print('Trac #{0}: Commit changed to {1}.'.format(number, newref[:6]))
         comment += '. '
         if self.is_ancestor_of(oldref, newref):
-            comment += 'New commits:\n' + self.log_table(newref, oldref)
+            ignore = copy.copy(MASTER_BRANCHES)
+            ignore.discard(branch)
+            if oldref != '0'*40:
+                ignore.add(oldref)
+            comment += 'New commits:\n' + self.log_table(newref, ignore=ignore)
         else:
             comment += 'This was a forced push. Recent commits:\n' + self.log_table(newref, limit=5)
         self.login.ticket.update(number, comment, attributes, True)
@@ -135,4 +139,4 @@ if __name__ == '__main__':
         branch = refname.split('/', 2)[-1]
         #print('pushing to branch {0}, new head commit is {1}'.format(branch, newref[:6]))
         for number, ticket in trac.ticket_iter(branch):
-            trac.update_commit(number, ticket, oldref, newref)
+            trac.update_commit(number, ticket, branch, oldref, newref)
