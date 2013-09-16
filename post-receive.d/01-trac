@@ -10,6 +10,9 @@ TRAC_URL = 'http://trac.sagemath.org'
 REALM = 'sage.math.washington.edu'
 MASTER_BRANCHES = {'u/ohanar/build_system', 'u/saraedum/ticket/14482'}
 
+# these specify the sizes of the commit tables
+MAX_NEW_COMMITS = 10
+FORCED_COMMITS = 5
 
 #### this script assumes that you have the following in your trac.ini
 #
@@ -93,7 +96,7 @@ class Trac(object):
             short_sha1 = line[:7]
             title = line[8:]
             table.append('||[changeset:{0}]||{1}||'.format(short_sha1, title))
-        return '\n'.join(table)
+        return table
 
     def is_ancestor_of(self, a, b):
         return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b]).strip()
@@ -124,9 +127,16 @@ class Trac(object):
             ignore.discard(branch)
             if oldref != '0'*40:
                 ignore.add(oldref)
-            comment += 'New commits:\n' + self.log_table(newref, ignore=ignore)
+            table = self.log_table(newref, ignore=ignore)
+            if len(table) > MAX_NEW_COMMITS:
+                comment += 'Last {0} new commits:\n'.format(MAX_NEW_COMMITS)
+                table = table[:MAX_NEW_COMMITS]
+            else:
+                comment += 'New commits:\n'
+            comment += '\n'.join(table)
         else:
-            comment += 'This was a forced push. Recent commits:\n' + self.log_table(newref, limit=5)
+            comment += 'This was a forced push. Recent commits:\n'
+            commit += '\n'.join(self.log_table(newref, limit=FORCED_COMMITS))
         self.login.ticket.update(number, comment, attributes, True)
 
 
