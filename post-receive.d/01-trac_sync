@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 
 while read oldrev newrev refname; do
-    git rev-list --reverse $newrev ^$oldrev  | \
+    if [ "$newrev" == "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+    if [ "$oldrev" == "0000000000000000000000000000000000000000" ]; then
+        git rev-list --reverse $newrev ^master
+    else
+        git rev-list --reverse $newrev ^$oldrev ^master
+    fi |
     while read rev; do
-        trac-admin /srv/trac/sage_trac changeset added '(default)' $rev
+        sudo -u www-data /usr/local/bin/trac-admin /srv/trac/sage_trac changeset added '(default)' $rev
     done
 done
