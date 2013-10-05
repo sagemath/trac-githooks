@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+while read oldrev newrev refname; do
+    git rev-list --reverse $newrev ^$oldrev  | \
+    while read rev; do
+        trac-admin /srv/trac/sage_trac changeset added '(default)' $rev
+    done
+done
