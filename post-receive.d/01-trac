@@ -8,7 +8,7 @@ TRAC_USER = 'git'
 
 TRAC_URL = 'http://trac.sagemath.org'
 REALM = 'sage.math.washington.edu'
-MASTER_BRANCHES = {'u/ohanar/build_system', 'u/saraedum/ticket/14482'}
+MASTER_BRANCHES = {'master'}
 
 # these specify the sizes of the commit tables
 MAX_NEW_COMMITS = 10
