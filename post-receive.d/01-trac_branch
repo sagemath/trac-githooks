@@ -136,7 +136,7 @@ class Trac(object):
             comment += '\n'.join(table)
         else:
             comment += 'This was a forced push. Recent commits:\n'
-            commit += '\n'.join(self.log_table(newref, limit=FORCED_COMMITS))
+            comment += '\n'.join(self.log_table(newref, limit=FORCED_COMMITS))
         self.login.ticket.update(number, comment, attributes, True)
 
 
