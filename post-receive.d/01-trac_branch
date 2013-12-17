@@ -98,7 +98,7 @@ class Trac(object):
         for line in log.splitlines():
             short_sha1 = line[:7]
             title = line[8:]
-            table.append('||[[{0}|{1}]]||{2}||'.format(self.get_commit_link(short_sha1), short_sha1, title))
+            table.append('||[[%s|%s]]||{{{%s}}}||'%(self.get_commit_link(short_sha1), short_sha1, title))
         return table
 
     def is_ancestor_of(self, a, b):
