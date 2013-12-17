@@ -105,6 +105,8 @@ class Trac(object):
         return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b]).strip()
 
     def update_commit(self, number, ticket, branch, oldref, newref):
+        if ticket['status'] == 'closed': # don't continue to update closed tickets
+            return
         if ticket.get('commit') == newref:
             print('Commit {0} is already listed on trac ticket {1}, doing nothing.'.format(newref[:6], number))
             return
