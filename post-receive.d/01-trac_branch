@@ -97,8 +97,8 @@ class Trac(object):
         table = []
         for line in log.splitlines():
             short_sha1 = line[:7]
-            title = line[8:]
-            table.append('||[[%s|%s]]||{{{%s}}}||'%(self.get_commit_link(short_sha1), short_sha1, title))
+            title = line[8:].decode('utf8')
+            table.append(u'||[[%s|%s]]||{{{%s}}}||'%(self.get_commit_link(short_sha1), short_sha1, title))
         return table
 
     def is_ancestor_of(self, a, b):
@@ -118,10 +118,10 @@ class Trac(object):
         # your changes. This ticket has been modified by someone else
         # since you started'"
         attributes = {'_ts': ticket['_ts'], 'commit':newref}
-        comment = 'Branch pushed to git repo; I updated commit sha1'
+        comment = u'Branch pushed to git repo; I updated commit sha1'
         if ticket['status'] == 'positive_review':
             attributes['action'] = 'back_to_review'
-            comment += ' and set ticket back to needs_review'
+            comment += u' and set ticket back to needs_review'
             print('Trac #{0}: Commit changed to {1}, setting ticket back to needs_review.'.format(
                 number, newref[:6]))
         else:
@@ -134,14 +134,14 @@ class Trac(object):
                 ignore.add(oldref)
             table = self.log_table(newref, ignore=ignore)
             if len(table) > MAX_NEW_COMMITS:
-                comment += 'Last {0} new commits:\n'.format(MAX_NEW_COMMITS)
+                comment += u'Last {0} new commits:\n'.format(MAX_NEW_COMMITS)
                 table = table[:MAX_NEW_COMMITS]
             else:
-                comment += 'New commits:\n'
-            comment += '\n'.join(table)
+                comment += u'New commits:\n'
+            comment += u'\n'.join(table)
         else:
-            comment += 'This was a forced push. Recent commits:\n'
-            comment += '\n'.join(self.log_table(newref, limit=FORCED_COMMITS))
+            comment += u'This was a forced push. Recent commits:\n'
+            comment += u'\n'.join(self.log_table(newref, limit=FORCED_COMMITS))
         self.login.ticket.update(number, comment, attributes, True)
 
 
