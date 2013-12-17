@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-BRANCHES="release beta master"
+BRANCHES="develop master"
 MIRRORS="github"
 
 declare -A bmap
