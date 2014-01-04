@@ -20,6 +20,30 @@ AUTHORS:
 from xmlrpclib import SafeTransport, Fault
 import urllib2
 
+class TracError(RuntimeError):
+    pass
+
+class TracConnectionError(TracError):
+    def __init__(self, msg=None):
+        if msg is None:
+            TracError.__init__(self, 'Connection to trac server failed.')
+        else:
+            TracError.__init__(self, msg)
+
+
+class TracInternalError(TracError):
+    def __init__(self, fault):
+        self._fault = fault
+        self.faultCode = fault.faultCode
+
+    def __str__(self):
+        return str(self._fault)
+
+
+class TracAuthenticationError(TracError):
+    def __init__(self):
+        TracError.__init__(self, 'Authentication with trac server failed.')
+
 class DigestTransport(object, SafeTransport):
     """
     Handles an HTTP transaction to an XML-RPC server.
@@ -129,8 +153,9 @@ class DigestTransport(object, SafeTransport):
             self.verbose = verbose
             return self.parse_response(response)
         except Fault as e:
-            from trac_error import TracInternalError
             raise TracInternalError(e)
-        except IOError as e:
-            from trac_error import TracConnectionError
-            raise TracConnectionError(e)
+        except urllib2.HTTPError as e:
+            if e.code == 401:
+                raise TracAuthenticationError()
+            else:
+                raise TracConnectionError(e.reason)

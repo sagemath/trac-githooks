@@ -10,7 +10,7 @@ while read line; do
 done
 
 for hook in ./hooks/post-receive.d/*; do
-    if [ -x $hook ]; then
+    if [ -x $hook -a -f $hook ]; then
         echo -e "$STDIN" | $hook
     fi
 done

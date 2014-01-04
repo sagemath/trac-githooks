@@ -2,17 +2,21 @@
 
 from __future__ import print_function
 
+import pygit2
+
 # putting the trac password in another file so that this file can be share publicly
 from trac_password import TRAC_PASSWORD
 TRAC_USER = 'git'
 
-TRAC_URL = 'http://trac.sagemath.org'
+TRAC_URL = 'http://localhost'
 REALM = 'sage.math.washington.edu'
 MASTER_BRANCHES = {'develop', 'master'}
 
+GIT_BASE_URL      = 'http://git.sagemath.org/sage.git/'
+GIT_COMMIT_URL    = GIT_BASE_URL + 'commit/?id={commit}'
+
 # these specify the sizes of the commit tables
 MAX_NEW_COMMITS = 10
-FORCED_COMMITS = 5
 
 #### this script assumes that you have the following in your trac.ini
 #
@@ -37,7 +41,6 @@ try:  # py3
     from xmlrpc.client import ServerProxy
 except ImportError:  # python 2.x
     from xmlrpclib import ServerProxy
-
 
 class Trac(object):
     
@@ -83,75 +86,96 @@ class Trac(object):
             self._cache[ticket_number] = output
             return output
    
-    def get_commit_link(self, sha1):
-        return 'http://git.sagemath.org/sage.git/commit/?id={0}'.format(sha1)
+    @property
+    def _git(self):
+        try:
+            return self.__git
+        except AttributeError:
+            self.__git = pygit2.Repository('.')
+            return self.__git
 
-    def log_table(self, new_commit, limit=None, ignore=MASTER_BRANCHES):
-        git_cmd = ['git', 'log', '--oneline']
-        if limit is not None:
-            git_cmd.append('--max-count={0}'.format(limit))
-        git_cmd.append(new_commit)
-        for branch in ignore:
-            git_cmd.append('^{0}'.format(branch))
-        log = subprocess.check_output(git_cmd)
+    def log_table(self, new_commit, limit=float('inf'), ignore=MASTER_BRANCHES):
+        walker = self._git.walk(self._git[new_commit].oid,
+                pygit2.GIT_SORT_TOPOLOGICAL | pygit2.GIT_SORT_TIME)
+
+        for b in ignore:
+            c = self._git.lookup_branch(b)
+            if c is None:
+                c = self._git.get(b)
+            else:
+                c = c.get_object()
+            if c is not None:
+                walker.hide(c.oid)
+
         table = []
-        for line in log.splitlines():
-            short_sha1 = line[:7]
-            title = line[8:].decode('utf8')
-            table.append(u'||[[%s|%s]]||{{{%s}}}||'%(self.get_commit_link(short_sha1), short_sha1, title))
+
+        for commit in walker:
+            if len(table) >= limit:
+                break
+            short_sha1 = commit.hex[:7]
+            title = commit.message.splitlines()
+            if title:
+                title = title[0]
+            else:
+                title = u''
+            table.append(
+                    u'||[%s %s]||{{{%s}}}||'%(
+                        GIT_COMMIT_URL.format(commit=commit.hex),
+                        short_sha1,
+                        title))
         return table
 
     def is_ancestor_of(self, a, b):
-        return a == '0'*40 or a == subprocess.check_output(['git', 'merge-base', a, b]).strip()
+        if a == '0'*40:
+            return True
+        a = self._git[a].oid; b = self._git[b].oid
+        return self._git.merge_base(a, b) == a
 
-    def update_commit(self, number, ticket, branch, oldref, newref):
+    def update_commit(self, number, ticket, branch, oldrev, newrev):
         if ticket['status'] == 'closed': # don't continue to update closed tickets
             return
-        if ticket.get('commit') == newref:
-            print('Commit {0} is already listed on trac ticket {1}, doing nothing.'.format(newref[:6], number))
+        if ticket.get('commit') == newrev:
+            print('Commit {0} is already listed on trac ticket {1}, doing nothing.'.format(newrev[:6], number))
             return
-        elif newref == '0'*40:
+        elif newrev == '0'*40:
             print('Warning, deleting branch that is attached to trac ticket {0}'.format(number))
             return
         # ts = time stamp. If we send back a timestamp too far in the
         # future then the server will reply with "Sorry, can not save
         # your changes. This ticket has been modified by someone else
         # since you started'"
-        attributes = {'_ts': ticket['_ts'], 'commit':newref}
+        attributes = {'_ts': ticket['_ts'], 'commit':newrev}
         comment = u'Branch pushed to git repo; I updated commit sha1'
         if ticket['status'] == 'positive_review':
             attributes['action'] = 'back_to_review'
             comment += u' and set ticket back to needs_review'
             print('Trac #{0}: Commit changed to {1}, setting ticket back to needs_review.'.format(
-                number, newref[:6]))
+                number, newrev[:6]))
         else:
-            print('Trac #{0}: Commit changed to {1}.'.format(number, newref[:6]))
-        comment += '. '
-        if self.is_ancestor_of(oldref, newref):
-            ignore = copy.copy(MASTER_BRANCHES)
-            ignore.discard(branch)
-            if oldref != '0'*40:
-                ignore.add(oldref)
-            table = self.log_table(newref, ignore=ignore)
-            if len(table) > MAX_NEW_COMMITS:
-                comment += u'Last {0} new commits:\n'.format(MAX_NEW_COMMITS)
-                table = table[:MAX_NEW_COMMITS]
-            else:
-                comment += u'New commits:\n'
-            comment += u'\n'.join(table)
+            print('Trac #{0}: Commit changed to {1}.'.format(number, newrev[:6]))
+        comment += u'. '
+        if not self.is_ancestor_of(oldrev, newrev):
+            comment += u'This was a forced push. '
+        ignore = copy.copy(MASTER_BRANCHES)
+        ignore.discard(branch)
+        if oldrev != '0'*40:
+            ignore.add(oldrev)
+        table = self.log_table(newrev, ignore=ignore)
+        if len(table) > MAX_NEW_COMMITS:
+            comment += u'Last {0} new commits:\n'.format(MAX_NEW_COMMITS)
+            table = table[:MAX_NEW_COMMITS]
         else:
-            comment += u'This was a forced push. Recent commits:\n'
-            comment += u'\n'.join(self.log_table(newref, limit=FORCED_COMMITS))
+            comment += u'New commits:\n'
+        comment += u'\n'.join(table)
         self.login.ticket.update(number, comment, attributes, True)
-
 
 if __name__ == '__main__':
     trac = Trac(TRAC_USER, TRAC_PASSWORD)
     for line in sys.stdin.readlines():
-        oldref, newref, refname = line.split()
+        oldrev, newrev, refname = line.split()
         if not refname.startswith('refs/heads/'):
             continue
         branch = refname.split('/', 2)[-1]
-        #print('pushing to branch {0}, new head commit is {1}'.format(branch, newref[:6]))
+        #print('pushing to branch {0}, new head commit is {1}'.format(branch, newrev[:6]))
         for number, ticket in trac.ticket_iter(branch):
-            trac.update_commit(number, ticket, branch, oldref, newref)
+            trac.update_commit(number, ticket, branch, oldrev, newrev)
