@@ -8,7 +8,7 @@ import pygit2
 from trac_password import TRAC_PASSWORD
 TRAC_USER = 'git'
 
-TRAC_URL = 'http://localhost'
+TRAC_URL = 'http://trac.sagemath.org'
 REALM = 'sage.math.washington.edu'
 MASTER_BRANCHES = {'develop', 'master'}
 
@@ -123,6 +123,7 @@ class Trac(object):
                         GIT_COMMIT_URL.format(commit=commit.hex),
                         short_sha1,
                         title))
+        table.reverse()
         return table
 
     def is_ancestor_of(self, a, b):
